@@ -1,0 +1,20 @@
+using UnityEngine;
+
+/// <summary>
+/// An instance of a targetable mask that spawns on the rhythm track.
+/// </summary>
+public class TargetableMask : MonoBehaviour
+{
+    [SerializeField] 
+    [Min(0)]
+    [Tooltip("The speed for the mask once it is spawned on the track.")]
+    private float m_Velocity;
+
+    private void Update()
+    {
+        // Move across the track.
+        Vector3 pos = transform.position;
+        pos.x -= m_Velocity * Time.deltaTime;
+        transform.position = pos;
+    }
+}
