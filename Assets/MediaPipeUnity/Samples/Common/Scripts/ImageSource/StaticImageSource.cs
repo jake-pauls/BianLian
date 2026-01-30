@@ -30,7 +30,7 @@ namespace Mediapipe.Unity
 
     private Texture2D _outputTexture;
     private Texture _image;
-    private Texture image
+    public Texture image
     {
       get
       {
