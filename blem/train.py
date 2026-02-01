@@ -4,18 +4,18 @@ import torch
 import torch.nn as nn
 import torch.onnx
 
-from model import ExpressionMLP
 from expression_dataset import ExpressionDataset
+from model import ExpressionMLP
 from torch.utils.data import DataLoader
 from torch.utils.data import random_split
 
 # Learning parameters
-total_epochs = 65
+total_epochs = 60
 lr = 1e-3
 
-# Load the dataset
-dataset = ExpressionDataset("data/mediapipe_expression_dataset.csv")
-# dataloader = DataLoader(dataset, batch_size=64, shuffle=True, drop_last=True)
+# Load the dataset (five frames per input, 255 features)
+num_input_features = 255
+dataset = ExpressionDataset("data/mediapipe_expression_dataset_five_frames.csv")
 
 # Split into training and validation to ensure this is actually converging
 train_size = int(0.8 * len(dataset))
@@ -26,7 +26,7 @@ train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
 val_loader = DataLoader(val_set, batch_size=64)
 
 # Create the model
-model = ExpressionMLP()
+model = ExpressionMLP(255, 5)
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 loss_fn = nn.CrossEntropyLoss()
 

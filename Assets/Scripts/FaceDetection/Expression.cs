@@ -13,6 +13,9 @@ namespace FaceDetection
         Happy,
         Sad,
         Angry,
-        Shocked
+        Shocked,
+        // This should always be at the end of the enumeration.
+        // Note that BLEM does not consider this a valid output label.
+        Max
     }
 }

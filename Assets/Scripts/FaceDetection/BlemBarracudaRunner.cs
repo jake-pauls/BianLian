@@ -16,6 +16,19 @@ namespace FaceDetection
         public bool Check;
         public NNModel BlemModelAsset;
 
+        [Header("Confidence Parameters")] 
+        [Range(0, 1)]
+        [SerializeField]
+        private float MinimumConfidence = 0.65f;
+
+        [Range(0, 1)] 
+        [SerializeField] 
+        private float EnterThreshold = 0.85f;
+
+        [Range(0, 1)]
+        [SerializeField] 
+        private float ExitThreshold = 0.75f; 
+
         // TODO: Setup when the Barracuda runner goes to the main sccene
         // [SerializeField] 
         // private PlayerController m_PlayerController;
@@ -25,6 +38,7 @@ namespace FaceDetection
         private Model m_Model;
 
         private Queue<float[]> m_InferenceQueue = new();
+        private float[] m_SmoothedProbabilities = new float[(int)Expression.Max];
 
         private void Awake()
         {
@@ -37,27 +51,68 @@ namespace FaceDetection
 
         private void Update()
         {
-            // No inference tasks to perform.
-            if (m_InferenceQueue.Count <= 0)
+            // No inference tasks to perform. Dequeue five rows at once.
+            if (m_InferenceQueue.Count < 5)
                 return;
             
-            float[] features = m_InferenceQueue.Dequeue();
-            using Tensor input = new(1, features.Length, features);
+            // Dequeue five rows because the first layer of the NN expects 5 sets of input features.
+            // Data across five frames seems to help it account for motion/subtle changes in motion a bit more.
+            float[] features1 = m_InferenceQueue.Dequeue();
+            float[] features2 = m_InferenceQueue.Dequeue();
+            float[] features3 = m_InferenceQueue.Dequeue();
+            float[] features4 = m_InferenceQueue.Dequeue();
+            float[] features5 = m_InferenceQueue.Dequeue();
+            float[] allFeatures = features1
+                .Concat(features2)
+                .Concat(features3)
+                .Concat(features4)
+                .Concat(features5)
+                .ToArray();
+            
+            using Tensor input = new(1, allFeatures.Length, allFeatures);
             m_Worker.Execute(input);
 
             using Tensor outputLogitsTensor = m_Worker.PeekOutput(); // Logits, since my model does not output softmax by default
             float[] outputLogits = outputLogitsTensor.ToReadOnlyArray();
             // TODO: Having the model do this would be way better.
-            float[] probs = Softmax(outputLogits);
-        
-            int expression = System.Array.IndexOf(probs, probs.Max());
-
-            Expression expressionValue = (Expression)expression;
-            if (m_CachedExpression != expressionValue)
+            float[] probabilities = Softmax(outputLogits);
+            
+            // 3. EMA Smoothing
+            float smoothingAlpha = 0.2f;
+            for (int i = 0; i < (int)Expression.Max; ++i)
             {
-                m_CachedExpression = expressionValue;
-                float confidence = probs[expression];
-                Debug.Log($"BLEM predicted your expression changed to {expressionValue}, with {confidence}% confidence.");
+                m_SmoothedProbabilities[i] = smoothingAlpha * probabilities[i] + (1f - smoothingAlpha) * m_SmoothedProbabilities[i];
+            }
+            
+            // 4. Pick Candidate
+            int expression = System.Array.IndexOf(m_SmoothedProbabilities, m_SmoothedProbabilities.Max());
+            float confidence = m_SmoothedProbabilities[expression];
+            Expression expressionValue = (Expression)expression;
+            
+            // 5. Confidence Threshold
+            // Only change the expression if confidence is above a certain value
+            if (confidence < MinimumConfidence)
+                return;
+            
+            // 6. Hysteresis
+            // Check if we have enough confidence to stay in the same expression.
+            if (m_CachedExpression == expressionValue)
+            {
+                // Example: The player was in the 'Happy' state, but now the confidence for 'Happy' has dropped below 40%.
+                // This may yield a more natural shift in emotion: 'Happy' -> 'Neutral' -> 'Sad'.
+                if (confidence < ExitThreshold)
+                {
+                    m_CachedExpression = Expression.Neutral;
+                    Debug.Log($"BLEM exited {expressionValue} as a result of having only {confidence}% confidence.");
+                }
+            }
+            else
+            {
+                if (confidence > EnterThreshold)
+                {
+                    m_CachedExpression = expressionValue;
+                    Debug.Log($"BLEM entered {expressionValue}, with {confidence}% confidence.");
+                }
             }
         }
 

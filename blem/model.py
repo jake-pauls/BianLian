@@ -16,12 +16,17 @@ class ExpressionMLP(nn.Module):
         4. Anger
         5. Shocked
     """
-    def __init__(self):
+    def __init__(self, num_input_features, num_output_labels):
         super().__init__()
+
+        # Not quite sure if this is the best layout for layers...
+        half_num_input_features = int(num_input_features / 2)
+        quarter_num_input_features = int(num_input_features / 4)
+
         # Three full-connected dense layers        
-        self.fc1 = nn.Linear(51, 32) # Input is 51 features
-        self.fc2 = nn.Linear(32, 16) # Intermediate layer so that we don't go from 51 straight to 5 
-        self.fc3 = nn.Linear(16, 5)  # Output one of 5 labels
+        self.fc1 = nn.Linear(num_input_features, half_num_input_features)
+        self.fc2 = nn.Linear(half_num_input_features, quarter_num_input_features)         
+        self.fc3 = nn.Linear(quarter_num_input_features, num_output_labels)  # Output one of 5 labels
     
     def forward(self, x):
         # Propogate the input throughout the layers

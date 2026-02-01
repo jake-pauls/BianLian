@@ -31,6 +31,11 @@ class ExpressionDataset(Dataset):
         # Convert to tensors
         self.features = torch.tensor(self.features, dtype=torch.float32)
         self.labels = torch.tensor(self.labels, dtype=torch.long)
+
+        print(self.labels.dtype)
+        print(self.labels.min(), self.labels.max())
+        print(torch.unique(self.labels))
+
     
     def __len__(self):
         return len(self.labels)
